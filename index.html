@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Production Tracker — Brimer Saldus</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f5f5;min-height:100vh;display:flex;justify-content:center;align-items:flex-start}
+.app{width:100%;max-width:420px;min-height:100vh;background:#fff;padding:0}
+.screen{display:none;padding:1.25rem;min-height:100vh}
+.screen.active{display:block}
+.app-bar{display:flex;align-items:center;gap:10px;margin-bottom:1.25rem}
+.app-bar h1{font-size:17px;font-weight:600;color:#111}
+.back-btn{background:none;border:none;cursor:pointer;color:#666;padding:4px;display:flex;align-items:center;border-radius:6px}
+.back-btn:active{background:#f0f0f0}
+.search-wrap{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:85vh;gap:1.5rem}
+.search-wrap h2{font-size:20px;font-weight:600;color:#111;text-align:center}
+.search-wrap p{font-size:14px;color:#666;text-align:center}
+.big-input{width:100%;font-size:36px;text-align:center;letter-spacing:10px;padding:18px;border:2px solid #ddd;border-radius:14px;background:#fff;color:#111;font-family:monospace;transition:border-color 0.15s}
+.big-input:focus{outline:none;border-color:#1a73e8;box-shadow:0 0 0 3px rgba(26,115,232,0.12)}
+.search-btn{width:100%;padding:15px;font-size:16px;font-weight:600;background:#1a73e8;color:#fff;border:none;border-radius:10px;cursor:pointer}
+.search-btn:active{opacity:0.85}
+.error-msg{font-size:13px;color:#c62828;text-align:center;background:#fce8e8;padding:10px 14px;border-radius:8px;width:100%}
+.item-header{background:#f8f9fa;border-radius:12px;padding:14px 16px;margin-bottom:1rem;border:1px solid #eee}
+.item-header .lbl{font-size:11px;color:#888;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:2px}
+.item-header .val{font-size:24px;font-weight:700;color:#111;font-family:monospace}
+.item-header .val.sm{font-size:15px;font-family:inherit;font-weight:600}
+.model-badge{display:inline-block;font-size:12px;padding:3px 10px;border-radius:20px;font-weight:600;background:#e6f4ea;color:#1e6e36;margin-top:6px}
+.section-label{font-size:11px;color:#888;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.05em;font-weight:600}
+.tasks-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:1rem}
+.task-btn{padding:16px 10px;border-radius:10px;border:1.5px solid #ddd;cursor:pointer;font-size:13px;font-weight:600;text-align:center;transition:all 0.15s}
+.task-btn.done{background:#f5f5f5;color:#999;border-color:#e8e8e8;cursor:default}
+.task-btn.todo{background:#e8f0fe;color:#1a73e8;border-color:#c5d8fd}
+.task-btn.todo:active{opacity:0.7}
+.task-name{display:block;margin-bottom:4px}
+.task-meta{display:block;font-size:10px;font-weight:400;opacity:0.75;line-height:1.3;word-break:break-word}
+.variants-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:1rem}
+.variant-btn{padding:22px 10px;border-radius:12px;border:1.5px solid #ddd;background:#fff;cursor:pointer;text-align:center;transition:all 0.15s}
+.variant-btn:active{background:#f5f5f5}
+.variant-btn.selected{border:2.5px solid #1a73e8;background:#e8f0fe}
+.variant-code{display:block;font-size:16px;font-weight:700;color:#111;margin-bottom:4px;font-family:monospace}
+.variant-desc{display:block;font-size:11px;color:#666;font-weight:500}
+.variant-btn.selected .variant-code{color:#1a73e8}
+.variant-btn.selected .variant-desc{color:#1a73e8}
+.worker-list{display:flex;flex-direction:column;gap:8px;margin-bottom:1rem}
+.worker-btn{display:flex;align-items:center;gap:12px;padding:13px 14px;border-radius:10px;border:1px solid #eee;background:#fff;cursor:pointer;text-align:left;transition:background 0.1s}
+.worker-btn:active{background:#f5f5f5}
+.worker-avatar{width:40px;height:40px;border-radius:50%;background:#e8f0fe;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#1a73e8;flex-shrink:0}
+.worker-name{font-size:14px;font-weight:600;color:#111}
+.worker-id{font-size:12px;color:#888;margin-top:1px}
+.confirm-card{background:#f8f9fa;border-radius:12px;padding:14px 16px;margin-bottom:1rem;border:1px solid #eee}
+.confirm-row{display:flex;justify-content:space-between;align-items:center;padding:7px 0;font-size:13px;gap:8px}
+.confirm-row:not(:last-child){border-bottom:1px solid #eee}
+.confirm-label{color:#888;flex-shrink:0;font-weight:500}
+.confirm-value{color:#111;font-weight:600;text-align:right}
+.confirm-value.muted{color:#888;font-size:12px;font-weight:400}
+.comment-wrap{margin-bottom:1rem}
+textarea{width:100%;padding:12px;font-size:14px;border:1px solid #ddd;border-radius:10px;background:#fff;color:#111;font-family:inherit;resize:none;height:80px}
+textarea:focus{outline:none;border-color:#1a73e8}
+.submit-btn{width:100%;padding:15px;font-size:16px;font-weight:700;background:#34a853;color:#fff;border:none;border-radius:10px;cursor:pointer;margin-bottom:8px}
+.submit-btn:active{opacity:0.85}
+.cancel-btn{width:100%;padding:13px;font-size:14px;font-weight:500;background:none;color:#666;border:1px solid #ddd;border-radius:10px;cursor:pointer}
+.success-wrap{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:85vh;gap:1.25rem;text-align:center;padding:1rem}
+.success-icon{width:72px;height:72px;border-radius:50%;background:#e6f4ea;display:flex;align-items:center;justify-content:center}
+.success-title{font-size:20px;font-weight:700;color:#111}
+.success-sub{font-size:14px;color:#666;max-width:280px;line-height:1.6}
+.new-btn{padding:14px 28px;font-size:15px;font-weight:600;background:#1a73e8;color:#fff;border:none;border-radius:10px;cursor:pointer}
+.progress-bar{height:4px;background:#eee;border-radius:2px;margin-bottom:1.25rem;overflow:hidden}
+.progress-fill{height:100%;background:#1a73e8;border-radius:2px;transition:width 0.3s}
+.badge{display:inline-block;font-size:11px;padding:2px 8px;border-radius:20px;font-weight:600;margin-left:6px;background:#fef3cd;color:#856404}
+.loading{text-align:center;padding:3rem;color:#888;font-size:14px}
+.spinner{display:inline-block;width:20px;height:20px;border:2px solid #ddd;border-top-color:#1a73e8;border-radius:50%;animation:spin 0.7s linear infinite;margin-right:8px;vertical-align:middle}
+@keyframes spin{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<div class="app">
+
+<!-- ── SEARCH ── -->
+<div id="s-search" class="screen active">
+  <div class="search-wrap">
+    <div><i class="ti ti-box-seam" style="font-size:48px;color:#ccc"></i></div>
+    <div>
+      <h2>Production tracker</h2>
+      <p style="margin-top:6px">Enter a 3-digit item number</p>
+    </div>
+    <div style="width:100%">
+      <input class="big-input" id="item-input" type="text" maxlength="3" placeholder="000" inputmode="numeric" autocomplete="off">
+    </div>
+    <div id="search-error" style="display:none" class="error-msg"></div>
+    <button class="search-btn" onclick="doSearch()">
+      <i class="ti ti-search"></i> Find item
+    </button>
+  </div>
+</div>
+
+<!-- ── TASKS ── -->
+<div id="s-tasks" class="screen">
+  <div class="app-bar">
+    <button class="back-btn" onclick="goTo('s-search')"><i class="ti ti-arrow-left" style="font-size:22px"></i></button>
+    <h1>Task status</h1>
+  </div>
+  <div class="item-header">
+    <div class="lbl">Item number</div>
+    <div class="val" id="t-item-num">—</div>
+    <div id="t-model-badge" style="display:none"></div>
+  </div>
+  <div class="section-label">Select a task to log</div>
+  <div class="tasks-grid" id="tasks-grid"></div>
+</div>
+
+<!-- ── VARIANT ── -->
+<div id="s-variant" class="screen">
+  <div class="app-bar">
+    <button class="back-btn" onclick="goTo('s-tasks')"><i class="ti ti-arrow-left" style="font-size:22px"></i></button>
+    <h1>Sproits <span class="badge">Step 1 of 2</span></h1>
+  </div>
+  <div class="item-header" style="margin-bottom:1rem">
+    <div class="lbl">Item</div>
+    <div class="val" id="v-item-num">—</div>
+  </div>
+  <div class="section-label">Select sproits variant</div>
+  <div class="variants-grid">
+    <button class="variant-btn" onclick="selectVariant('DA30-KAIROS',this)"><span class="variant-code">DA30</span><span class="variant-desc">KAIROS</span></button>
+    <button class="variant-btn" onclick="selectVariant('HA30-HYUNDAI',this)"><span class="variant-code">HA30</span><span class="variant-desc">HYUNDAI</span></button>
+    <button class="variant-btn" onclick="selectVariant('DA45-KAIROS',this)"><span class="variant-code">DA45</span><span class="variant-desc">KAIROS</span></button>
+    <button class="variant-btn" onclick="selectVariant('HA45-HYUNDAI',this)"><span class="variant-code">HA45</span><span class="variant-desc">HYUNDAI</span></button>
+  </div>
+</div>
+
+<!-- ── WORKERS ── -->
+<div id="s-workers" class="screen">
+  <div class="app-bar">
+    <button class="back-btn" id="workers-back-btn"><i class="ti ti-arrow-left" style="font-size:22px"></i></button>
+    <h1>Select worker</h1>
+  </div>
+  <div class="item-header" style="margin-bottom:0.75rem">
+    <div class="lbl">Logging task</div>
+    <div class="val sm" id="w-task-name">—</div>
+  </div>
+  <p style="font-size:13px;color:#888;margin-bottom:1rem">Showing workers qualified for this task</p>
+  <div class="worker-list" id="workers-list"></div>
+</div>
+
+<!-- ── CONFIRM ── -->
+<div id="s-confirm" class="screen">
+  <div class="app-bar">
+    <button class="back-btn" onclick="goTo('s-workers')"><i class="ti ti-arrow-left" style="font-size:22px"></i></button>
+    <h1>Confirm & submit</h1>
+  </div>
+  <div class="progress-bar"><div class="progress-fill" style="width:85%"></div></div>
+  <div class="confirm-card">
+    <div class="confirm-row"><span class="confirm-label">Item</span><span class="confirm-value" id="c-item">—</span></div>
+    <div class="confirm-row" id="c-variant-row" style="display:none"><span class="confirm-label">Variant</span><span class="confirm-value" id="c-variant">—</span></div>
+    <div class="confirm-row"><span class="confirm-label">Task</span><span class="confirm-value" id="c-task">—</span></div>
+    <div class="confirm-row"><span class="confirm-label">Worker</span><span class="confirm-value" id="c-worker">—</span></div>
+    <div class="confirm-row"><span class="confirm-label">Saved as</span><span class="confirm-value muted" id="c-saved-as">—</span></div>
+    <div class="confirm-row"><span class="confirm-label">Time</span><span class="confirm-value" id="c-time">—</span></div>
+  </div>
+  <div class="comment-wrap">
+    <div class="section-label" style="margin-bottom:6px">Comment (optional)</div>
+    <textarea id="comment-input" placeholder="Add any notes about this task..."></textarea>
+  </div>
+  <button class="submit-btn" id="submit-btn" onclick="doSubmit()"><i class="ti ti-check"></i> Submit</button>
+  <button class="cancel-btn" onclick="goTo('s-search')">Cancel</button>
+</div>
+
+<!-- ── SUCCESS ── -->
+<div id="s-success" class="screen">
+  <div class="success-wrap">
+    <div class="success-icon"><i class="ti ti-check" style="font-size:36px;color:#34a853"></i></div>
+    <div class="success-title">Task logged!</div>
+    <p class="success-sub" id="success-msg">Entry saved.</p>
+    <button class="new-btn" onclick="goTo('s-search')">Log another task</button>
+  </div>
+</div>
+
+</div><!-- .app -->
+
+<script>
+// ─────────────────────────────────────────
+// CONFIGURATION — fill in your credentials
+// ─────────────────────────────────────────
+const SHEET_ID = 1e1i2NlAk9IDVDwyqhdzqaCxAJqULdDYf8vJ1yGnoAZs;
+const API_KEY  = AIzaSyDiVw0RkfEgUV5KHDrPDFuv_BskWYJSHAs;
+// ─────────────────────────────────────────
+
+const ITEMS_TAB   = 'Items';
+const WORKERS_TAB = 'Workers';
+const LOG_TAB     = 'Log';
+const TASKS       = ['Sproits','Glued','Finished','Wrapped','Checked','Packed','Shipped'];
+const SPROITS     = 'Sproits';
+
+let state = {
+  itemNumber:null, itemRowIndex:null, itemData:null, itemModel:null,
+  selectedTask:null, selectedVariant:null, selectedWorker:null, submitTimestamp:null
+};
+let sheetsData = { items:null, workers:null };
+
+function goTo(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  window.scrollTo(0,0);
+}
+
+function getInitials(n){return(n||'?').split(/[\s\-_]/).map(w=>w[0]).join('').toUpperCase().slice(0,2)}
+function formatTime(d){return d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})+' '+d.toLocaleDateString([],{day:'2-digit',month:'short',year:'numeric'})}
+function makeEntry(name,ts){return`${name} | ${formatTime(ts)}`}
+
+async function fetchSheet(tab){
+  const url=`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(tab)}?key=${API_KEY}`;
+  const r=await fetch(url);
+  if(!r.ok) throw new Error(`Could not load ${tab} sheet. Check your Sheet ID and API key.`);
+  const d=await r.json();
+  return d.values||[];
+}
+
+async function updateCell(tab,sheetRow,col,value){
+  const colLetter=String.fromCharCode(64+col);
+  const range=`${encodeURIComponent(tab)}!${colLetter}${sheetRow}`;
+  const url=`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${range}?valueInputOption=USER_ENTERED&key=${API_KEY}`;
+  await fetch(url,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({values:[[value]]})});
+}
+
+async function appendLog(entry){
+  const url=`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(LOG_TAB)}!A1:append?valueInputOption=USER_ENTERED&key=${API_KEY}`;
+  await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({values:[[entry.timestamp,entry.item,entry.model||'',entry.task,entry.variant||'',entry.workerID,entry.workerName,entry.comment]]})
+  });
+}
+
+async function loadData(){
+  sheetsData.items   = await fetchSheet(ITEMS_TAB);
+  sheetsData.workers = await fetchSheet(WORKERS_TAB);
+}
+
+async function doSearch(){
+  const val=document.getElementById('item-input').value.trim().padStart(3,'0');
+  const err=document.getElementById('search-error');
+  err.style.display='none';
+  if(!val||val.length!==3||isNaN(val)){
+    err.textContent='Please enter a valid 3-digit item number.';
+    err.style.display='block'; return;
+  }
+  const btn=document.querySelector('.search-btn');
+  btn.innerHTML='<span class="spinner"></span> Searching...';
+  btn.disabled=true;
+  try{
+    if(!sheetsData.items) await loadData();
+    const rowIdx=sheetsData.items.findIndex((r,i)=>i>0&&r[0]===val);
+    if(rowIdx<0){
+      err.textContent=`Item ${val} not found. Ask your manager to add it to the sheet.`;
+      err.style.display='block'; return;
+    }
+    const row=sheetsData.items[rowIdx];
+    const headers=sheetsData.items[0];
+    state.itemNumber=val;
+    state.itemRowIndex=rowIdx+1;
+    state.itemModel=row[1]||'';
+    state.itemData={};
+    TASKS.forEach(t=>{const c=headers.indexOf(t);state.itemData[t]=c>=0?(row[c]||''):'';});
+    renderTasks(); goTo('s-tasks');
+  } catch(e){
+    err.textContent=e.message||'Connection error. Check your internet and try again.';
+    err.style.display='block';
+  } finally{
+    btn.innerHTML='<i class="ti ti-search"></i> Find item';
+    btn.disabled=false;
+  }
+}
+
+function renderTasks(){
+  document.getElementById('t-item-num').textContent=state.itemNumber;
+  const mb=document.getElementById('t-model-badge');
+  if(state.itemModel){mb.style.display='block';mb.innerHTML=`<span class="model-badge"><i class="ti ti-tag"></i> ${state.itemModel}</span>`;}
+  else mb.style.display='none';
+  const grid=document.getElementById('tasks-grid');
+  grid.innerHTML='';
+  TASKS.forEach(task=>{
+    const entry=state.itemData[task]||'';
+    const done=entry.length>0;
+    const btn=document.createElement('button');
+    btn.className=`task-btn ${done?'done':'todo'}`;
+    const shortEntry=done?entry.split(' | ')[0]:'';
+    btn.innerHTML=`<span class="task-name">${done?'<i class="ti ti-check"></i> ':''}${task}</span><span class="task-meta">${done?shortEntry:task===SPROITS?'Select variant':'Tap to log'}</span>`;
+    if(!done) btn.onclick=()=>task===SPROITS?startSproits():selectTask(task);
+    grid.appendChild(btn);
+  });
+}
+
+function startSproits(){
+  state.selectedTask=SPROITS; state.selectedVariant=null;
+  document.getElementById('v-item-num').textContent=state.itemNumber;
+  document.querySelectorAll('.variant-btn').forEach(b=>b.classList.remove('selected'));
+  goTo('s-variant');
+}
+
+function selectVariant(variant,btn){
+  state.selectedVariant=variant;
+  document.querySelectorAll('.variant-btn').forEach(b=>b.classList.remove('selected'));
+  btn.classList.add('selected');
+  setTimeout(()=>{
+    document.getElementById('w-task-name').textContent=`${SPROITS} — ${variant}`;
+    document.getElementById('workers-back-btn').onclick=()=>goTo('s-variant');
+    renderWorkers(SPROITS); goTo('s-workers');
+  },200);
+}
+
+function selectTask(task){
+  state.selectedTask=task; state.selectedVariant=null;
+  document.getElementById('w-task-name').textContent=task;
+  document.getElementById('workers-back-btn').onclick=()=>goTo('s-tasks');
+  renderWorkers(task); goTo('s-workers');
+}
+
+function renderWorkers(task){
+  const hdrs=sheetsData.workers[0];
+  const col=hdrs.indexOf(task);
+  const eligible=sheetsData.workers.slice(1).filter(w=>col>=0&&(w[col]||'').toUpperCase()==='TRUE');
+  const list=document.getElementById('workers-list');
+  list.innerHTML='';
+  if(!eligible.length){list.innerHTML=`<p style="color:#888;font-size:14px;text-align:center;padding:2rem">No workers qualified for this task.</p>`;return;}
+  eligible.forEach(w=>{
+    const btn=document.createElement('button');
+    btn.className='worker-btn';
+    btn.innerHTML=`<div class="worker-avatar">${getInitials(w[1]||w[0])}</div><div><div class="worker-name">${w[1]||'Unknown'}</div><div class="worker-id">ID: ${w[0]}</div></div><i class="ti ti-chevron-right" style="margin-left:auto;color:#ccc"></i>`;
+    btn.onclick=()=>selectWorker(w[0],w[1]);
+    list.appendChild(btn);
+  });
+}
+
+function selectWorker(id,name){
+  state.selectedWorker={id,name};
+  const now=new Date(); state.submitTimestamp=now;
+  const entryValue=makeEntry(name,now);
+  document.getElementById('c-item').textContent=state.itemNumber;
+  document.getElementById('c-task').textContent=state.selectedTask;
+  const vRow=document.getElementById('c-variant-row');
+  if(state.selectedVariant){vRow.style.display='flex';document.getElementById('c-variant').textContent=state.selectedVariant;}
+  else vRow.style.display='none';
+  document.getElementById('c-worker').textContent=`${name} (${id})`;
+  document.getElementById('c-saved-as').textContent=`"${entryValue}"`;
+  document.getElementById('c-time').textContent=formatTime(now);
+  document.getElementById('comment-input').value='';
+  goTo('s-confirm');
+}
+
+async function doSubmit(){
+  const comment=document.getElementById('comment-input').value.trim();
+  const now=state.submitTimestamp||new Date();
+  const entryValue=makeEntry(state.selectedWorker.name,now);
+  const headers=sheetsData.items[0];
+  const taskCol=headers.indexOf(state.selectedTask)+1;
+  const sheetRow=state.itemRowIndex+1;
+  const btn=document.getElementById('submit-btn');
+  btn.innerHTML='<span class="spinner"></span> Saving...'; btn.disabled=true;
+  try{
+    await updateCell(ITEMS_TAB,sheetRow,taskCol,entryValue);
+    if(state.selectedVariant){
+      const modelCol=headers.indexOf('Model')+1;
+      await updateCell(ITEMS_TAB,sheetRow,modelCol,state.selectedVariant);
+    }
+    await appendLog({
+      timestamp:now.toISOString(),item:state.itemNumber,
+      model:state.selectedVariant||state.itemModel,
+      task:state.selectedTask,variant:state.selectedVariant||'',
+      workerID:state.selectedWorker.id,workerName:state.selectedWorker.name,comment
+    });
+    state.itemData[state.selectedTask]=entryValue;
+    if(state.selectedVariant) state.itemModel=state.selectedVariant;
+    const taskLabel=state.selectedVariant?`${state.selectedTask} — ${state.selectedVariant}`:state.selectedTask;
+    document.getElementById('success-msg').textContent=`${taskLabel} logged for item ${state.itemNumber} by ${state.selectedWorker.name}.`;
+    goTo('s-success');
+  } catch(e){
+    alert('Could not save. Check your internet connection and try again.');
+  } finally{
+    btn.innerHTML='<i class="ti ti-check"></i> Submit'; btn.disabled=false;
+  }
+}
+
+document.getElementById('item-input').addEventListener('keydown',e=>{if(e.key==='Enter')doSearch()});
+document.getElementById('item-input').addEventListener('input',e=>{e.target.value=e.target.value.replace(/\D/g,'').slice(0,3)});
+</script>
+</body>
+</html>
