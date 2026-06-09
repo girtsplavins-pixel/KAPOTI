@@ -321,21 +321,24 @@ async function doSearch() {
     return;
   }
 
-  const btn = document.querySelector('.search-btn');
+ const btn = document.querySelector('.search-btn');
   btn.innerHTML = '<span class="spinner"></span> Searching...';
   btn.disabled = true;
 
   try {
     if (!sheetsData.items) await loadData();
 
-    let rowIdx = sheetsData.items.findIndex((r, i) => i > 0 && String(r[0]).trim() === String(raw).trim());
+    // Look up items safely by targeting standard text evaluation indexes
+    let rowIdx = sheetsData.items.findIndex((r, i) => i > 0 && r && r[0] && String(r[0]).trim() === String(raw).trim());
     if (rowIdx < 0) {
-      rowIdx = sheetsData.items.findIndex((r, i) => i > 0 && String(r[0]).trim() === String(val).trim());
+      rowIdx = sheetsData.items.findIndex((r, i) => i > 0 && r && r[0] && String(r[0]).trim() === String(val).trim());
     }
 
     if (rowIdx < 0) {
       err.textContent = `Item ${raw} not found.`;
       err.style.display = 'block';
+      btn.innerHTML = 'Search'; // Reset button text if item is missing
+      btn.disabled = false;     // Re-enable button interaction
       return;
     }
 
