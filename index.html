@@ -208,7 +208,13 @@ function goTo(id){
 
 function getInitials(n){return(n||'?').split(/[\s\-_]/).map(w=>w[0]).join('').toUpperCase().slice(0,2)}
 function formatTime(d){return d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})+' '+d.toLocaleDateString([],{day:'2-digit',month:'short',year:'numeric'})}
-function makeEntry(name,ts){return`${name} | ${formatTime(ts)}`}
+function makeEntry(name,ts){
+  const firstName=name.split(/[\s_\-]/)[0];
+  const d=ts;
+  const day=String(d.getDate()).padStart(2,'0');
+  const month=String(d.getMonth()+1).padStart(2,'0');
+  return`${firstName} | ${day}/${month}`;
+}
 
 async function fetchSheet(tab){
   const action = tab === ITEMS_TAB ? 'getItems' : 'getWorkers';
