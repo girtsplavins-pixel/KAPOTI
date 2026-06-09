@@ -180,40 +180,52 @@ textarea:focus{outline:none;border-color:#1a73e8}
 </div><!-- .app -->
 
 
+
 <script>
 // === CONFIGURATION — fill in your Apps Script URL ===
 const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxsPwWpjMNEPDrqYFis0KYlYHLNbuzdGdWiErCSlQPGL2feKt45UB9xG7BXrDmYFjyA/exec';
 // =====================================================
 
-const ITEMS_TAB   = 'Items';
+const ITEMS_TAB = 'Items';
 const WORKERS_TAB = 'Workers';
-const LOG_TAB     = 'Log';
-const TASKS       = ['Sproits','Apzāģēšana','Aplīmēšana/Montāža','Slīpēšana/Sāni','Izkrāsošana','Labošana','Samērīšana','Pakošana'];
-const SPROITS     = 'Sproits';
+const LOG_TAB = 'Log';
+
+const TASKS = [
+  'Sproits',
+  'Apzāģēšana',
+  'Aplīmēšana/Montāža',
+  'Slīpēšana/Sāni',
+  'Izkrāsošana',
+  'Labošana',
+  'Samērīšana',
+  'Pakošana'
+];
+
+const SPROITS = 'Sproits';
 
 let state = {
-  itemNumber:null,
-  itemRowIndex:null,
-  itemData:null,
-  itemModel:null,
-  selectedTask:null,
-  selectedVariant:null,
-  selectedWorker:null,
-  submitTimestamp:null
+  itemNumber: null,
+  itemRowIndex: null,
+  itemData: null,
+  itemModel: null,
+  selectedTask: null,
+  selectedVariant: null,
+  selectedWorker: null,
+  submitTimestamp: null
 };
 
 let sheetsData = {
-  items:null,
-  workers:null
+  items: null,
+  workers: null
 };
 
-function goTo(id){
+function goTo(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.getElementById(id).classList.add('active');
   window.scrollTo(0, 0);
 }
 
-function getInitials(n){
+function getInitials(n) {
   return (n || '?')
     .split(/[\s\-_]/)
     .map(w => w[0])
@@ -222,16 +234,16 @@ function getInitials(n){
     .slice(0, 2);
 }
 
-function formatTime(d){
-  return d.toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' }) + ' ' +
-         d.toLocaleDateString([], { day:'2-digit', month:'short', year:'numeric' });
+function formatTime(d) {
+  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' ' +
+         d.toLocaleDateString([], { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
-function makeEntry(name, ts){
+function makeEntry(name, ts) {
   return `${name} | ${formatTime(ts)}`;
 }
 
-async function fetchSheet(tab){
+async function fetchSheet(tab) {
   const action = tab === ITEMS_TAB ? 'getItems' : 'getWorkers';
   const r = await fetch(`${SCRIPT_URL}?action=${action}`);
 
@@ -239,7 +251,15 @@ async function fetchSheet(tab){
     throw new Error(`Could not load ${tab}. Check your Apps Script URL.`);
   }
 
-  const d = await r.json();
+  const txt = await r.text();
+  let d;
+
+  try {
+    d = JSON.parse(txt);
+  } catch (e) {
+    throw new Error(`Invalid JSON returned while loading ${tab}: ${txt}`);
+  }
+
   if (d.status !== 'ok') {
     throw new Error(d.message || `Error loading ${tab}`);
   }
@@ -247,7 +267,7 @@ async function fetchSheet(tab){
   return d.data || [];
 }
 
-async function postForm(payload){
+async function postForm(payload) {
   const r = await fetch(SCRIPT_URL, {
     method: 'POST',
     body: new URLSearchParams(payload)
@@ -259,7 +279,7 @@ async function postForm(payload){
   try {
     data = JSON.parse(txt);
   } catch (e) {
-    throw new Error(txt || 'Invalid server response');
+    throw new Error(`Server returned invalid JSON: ${txt}`);
   }
 
   if (data.status !== 'ok') {
@@ -269,7 +289,7 @@ async function postForm(payload){
   return data;
 }
 
-async function updateCell(itemNumber, column, value){
+async function updateCell(itemNumber, column, value) {
   return postForm({
     action: 'updateCell',
     itemNumber: itemNumber,
@@ -278,7 +298,7 @@ async function updateCell(itemNumber, column, value){
   });
 }
 
-async function appendLog(entry){
+async function appendLog(entry) {
   return postForm({
     action: 'appendLog',
     timestamp: entry.timestamp || '',
@@ -292,12 +312,12 @@ async function appendLog(entry){
   });
 }
 
-async function loadData(){
-  sheetsData.items   = await fetchSheet(ITEMS_TAB);
+async function loadData() {
+  sheetsData.items = await fetchSheet(ITEMS_TAB);
   sheetsData.workers = await fetchSheet(WORKERS_TAB);
 }
 
-async function doSearch(){
+async function doSearch() {
   const raw = document.getElementById('item-input').value.trim();
   const val = raw.padStart(3, '0');
   const err = document.getElementById('search-error');
@@ -317,10 +337,9 @@ async function doSearch(){
   try {
     if (!sheetsData.items) await loadData();
 
-    // Try exact match first, then zero-padded match
-    let rowIdx = sheetsData.items.findIndex((r, i) => i > 0 && String(r[0]) === String(raw));
+    let rowIdx = sheetsData.items.findIndex((r, i) => i > 0 && String(r[0]).trim() === String(raw).trim());
     if (rowIdx < 0) {
-      rowIdx = sheetsData.items.findIndex((r, i) => i > 0 && String(r[0]) === String(val));
+      rowIdx = sheetsData.items.findIndex((r, i) => i > 0 && String(r[0]).trim() === String(val).trim());
     }
 
     if (rowIdx < 0) {
@@ -332,10 +351,10 @@ async function doSearch(){
     const row = sheetsData.items[rowIdx];
     const headers = sheetsData.items[0];
 
-    state.itemNumber   = row[0];
+    state.itemNumber = row[0];
     state.itemRowIndex = rowIdx + 1;
-    state.itemModel    = row[1] || '';
-    state.itemData     = {};
+    state.itemModel = row[1] || '';
+    state.itemData = {};
 
     TASKS.forEach(t => {
       const c = headers.indexOf(t);
@@ -354,7 +373,7 @@ async function doSearch(){
   }
 }
 
-function renderTasks(){
+function renderTasks() {
   document.getElementById('t-item-num').textContent = state.itemNumber;
 
   const mb = document.getElementById('t-model-badge');
@@ -389,7 +408,7 @@ function renderTasks(){
   });
 }
 
-function startSproits(){
+function startSproits() {
   state.selectedTask = SPROITS;
   state.selectedVariant = null;
 
@@ -399,7 +418,7 @@ function startSproits(){
   goTo('s-variant');
 }
 
-function selectVariant(variant, btn){
+function selectVariant(variant, btn) {
   state.selectedVariant = variant;
 
   document.querySelectorAll('.variant-btn').forEach(b => b.classList.remove('selected'));
@@ -413,7 +432,7 @@ function selectVariant(variant, btn){
   }, 200);
 }
 
-function selectTask(task){
+function selectTask(task) {
   state.selectedTask = task;
   state.selectedVariant = null;
 
@@ -424,7 +443,7 @@ function selectTask(task){
   goTo('s-workers');
 }
 
-function renderWorkers(task){
+function renderWorkers(task) {
   const hdrs = sheetsData.workers[0];
   const col = hdrs.indexOf(task);
 
@@ -454,7 +473,7 @@ function renderWorkers(task){
   });
 }
 
-function selectWorker(id, name){
+function selectWorker(id, name) {
   state.selectedWorker = { id, name };
 
   const now = new Date();
@@ -481,20 +500,23 @@ function selectWorker(id, name){
   goTo('s-confirm');
 }
 
-async function doSubmit(){
+async function doSubmit() {
   const comment = document.getElementById('comment-input').value.trim();
   const now = state.submitTimestamp || new Date();
   const entryValue = makeEntry(state.selectedWorker.name, now);
 
   const headers = sheetsData.items[0];
   const taskCol = headers.indexOf(state.selectedTask) + 1;
-  const sheetRow = state.itemRowIndex;
 
   const btn = document.getElementById('submit-btn');
   btn.innerHTML = '<span class="spinner"></span> Saving...';
   btn.disabled = true;
 
   try {
+    if (taskCol <= 0) {
+      throw new Error(`Task column not found in Items sheet: ${state.selectedTask}`);
+    }
+
     await updateCell(state.itemNumber, headers[taskCol - 1], entryValue);
 
     if (state.selectedVariant) {
