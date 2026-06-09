@@ -180,10 +180,9 @@ textarea:focus{outline:none;border-color:#1a73e8}
 </div><!-- .app -->
 
 <script>
-// === CONFIGURATION — fill in your credentials ===
-const SHEET_ID = '1e1i2NlAk9IDVDwyqhdzqaCxAJqULdDYf8vJ1yGnoAZs';
-const API_KEY  = 'AIzaSyDiVw0RkfEgUV5KHDrPDFuv_BskWYJSHAs';
-// ================================================
+// === CONFIGURATION — fill in your Apps Script URL ===
+const SCRIPT_URL = 'https://script.google.com/u/0/home/projects/1WvVcG6K9UeP1DmSBwyDx_wUvQ44kdeoOsSg-QBMMHk0owRxcTp-PzfFx/edit';
+// =====================================================
 
 const ITEMS_TAB   = 'Items';
 const WORKERS_TAB = 'Workers';
@@ -208,24 +207,45 @@ function formatTime(d){return d.toLocaleTimeString([],{hour:'2-digit',minute:'2-
 function makeEntry(name,ts){return`${name} | ${formatTime(ts)}`}
 
 async function fetchSheet(tab){
-  const url=`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(tab)}?key=${API_KEY}`;
-  const r=await fetch(url);
-  if(!r.ok) throw new Error(`Could not load ${tab} sheet. Check your Sheet ID and API key.`);
-  const d=await r.json();
-  return d.values||[];
+  const action = tab === ITEMS_TAB ? 'getItems' : 'getWorkers';
+  const r = await fetch(`${SCRIPT_URL}?action=${action}`);
+  if(!r.ok) throw new Error(`Could not load ${tab}. Check your Apps Script URL.`);
+  const d = await r.json();
+  if(d.status !== 'ok') throw new Error(d.message || `Error loading ${tab}`);
+  return d.data || [];
 }
 
-async function updateCell(tab,sheetRow,col,value){
-  const colLetter=String.fromCharCode(64+col);
-  const range=`${encodeURIComponent(tab)}!${colLetter}${sheetRow}`;
-  const url=`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${range}?valueInputOption=USER_ENTERED&key=${API_KEY}`;
-  await fetch(url,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({values:[[value]]})});
+async function updateCell(tab, sheetRow, col, value){
+  // col is 1-based index — convert to column name using headers
+  const headers = sheetsData.items[0];
+  const columnName = col <= headers.length ? headers[col-1] : '';
+  await fetch(SCRIPT_URL, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      action: 'updateCell',
+      itemNumber: state.itemNumber,
+      column: columnName,
+      value: value
+    })
+  });
 }
 
 async function appendLog(entry){
-  const url=`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(LOG_TAB)}!A1:append?valueInputOption=USER_ENTERED&key=${API_KEY}`;
-  await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({values:[[entry.timestamp,entry.item,entry.model||'',entry.task,entry.variant||'',entry.workerID,entry.workerName,entry.comment]]})
+  await fetch(SCRIPT_URL, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      action:     'appendLog',
+      timestamp:  entry.timestamp,
+      itemNumber: entry.item,
+      model:      entry.model   || '',
+      task:       entry.task,
+      variant:    entry.variant || '',
+      workerID:   entry.workerID,
+      workerName: entry.workerName,
+      comment:    entry.comment || ''
+    })
   });
 }
 
@@ -257,7 +277,7 @@ async function doSearch(){
     }
     const row=sheetsData.items[rowIdx];
     const headers=sheetsData.items[0];
-    state.itemNumber=val;
+    state.itemNumber=row[0]; // use exact value from sheet
     state.itemRowIndex=rowIdx+1;
     state.itemModel=row[1]||'';
     state.itemData={};
@@ -354,7 +374,7 @@ async function doSubmit(){
   const entryValue=makeEntry(state.selectedWorker.name,now);
   const headers=sheetsData.items[0];
   const taskCol=headers.indexOf(state.selectedTask)+1;
-  const sheetRow=state.itemRowIndex+1;
+  const sheetRow=state.itemRowIndex; // itemRowIndex = rowIdx+1, already maps to correct sheet row
   const btn=document.getElementById('submit-btn');
   btn.innerHTML='<span class="spinner"></span> Saving...'; btn.disabled=true;
   try{
