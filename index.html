@@ -70,7 +70,12 @@ textarea:focus{outline:none;border-color:#1a73e8}
 .progress-bar{height:4px;background:#eee;border-radius:2px;margin-bottom:1.25rem;overflow:hidden}
 .progress-fill{height:100%;background:#1a73e8;border-radius:2px;transition:width 0.3s}
 .badge{display:inline-block;font-size:11px;padding:2px 8px;border-radius:20px;font-weight:600;margin-left:6px;background:#fef3cd;color:#856404}
-.loading{text-align:center;padding:3rem;color:#888;font-size:14px}
+.po-list{display:flex;flex-direction:column;gap:8px;margin-bottom:1rem}
+.po-btn{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-radius:10px;border:1px solid #eee;background:#fff;cursor:pointer;text-align:left}
+.po-btn:active{background:#f5f5f5}
+.po-number{font-size:15px;font-weight:700;color:#111;font-family:monospace}
+.po-detail{font-size:12px;color:#888;margin-top:2px}
+.po-count{font-size:13px;font-weight:600;color:#1a73e8;background:#e8f0fe;padding:4px 10px;border-radius:20px;white-space:nowrap}
 .spinner{display:inline-block;width:20px;height:20px;border:2px solid #ddd;border-top-color:#1a73e8;border-radius:50%;animation:spin 0.7s linear infinite;margin-right:8px;vertical-align:middle}
 @keyframes spin{to{transform:rotate(360deg)}}
 </style>
@@ -130,6 +135,21 @@ textarea:focus{outline:none;border-color:#1a73e8}
   </div>
 </div>
 
+<!-- ── PO SELECTION ── -->
+<div id="s-po" class="screen">
+  <div class="app-bar">
+    <button class="back-btn" onclick="goTo('s-tasks')"><i class="ti ti-arrow-left" style="font-size:22px"></i></button>
+    <h1>Select PO number</h1>
+  </div>
+  <div class="item-header" style="margin-bottom:0.75rem">
+    <div class="lbl">Item</div>
+    <div class="val" id="po-item-num">—</div>
+  </div>
+  <p style="font-size:13px;color:#888;margin-bottom:1rem">Select the PO this item is being finished for</p>
+  <div id="po-loading" style="text-align:center;padding:2rem;color:#888;font-size:14px;display:none">Loading PO numbers...</div>
+  <div class="po-list" id="po-list"></div>
+</div>
+
 <!-- ── WORKERS ── -->
 <div id="s-workers" class="screen">
   <div class="app-bar">
@@ -154,6 +174,7 @@ textarea:focus{outline:none;border-color:#1a73e8}
   <div class="confirm-card">
     <div class="confirm-row"><span class="confirm-label">Item</span><span class="confirm-value" id="c-item">—</span></div>
     <div class="confirm-row" id="c-variant-row" style="display:none"><span class="confirm-label">Variant</span><span class="confirm-value" id="c-variant">—</span></div>
+    <div class="confirm-row" id="c-po-row" style="display:none"><span class="confirm-label">PO</span><span class="confirm-value" id="c-po">—</span></div>
     <div class="confirm-row"><span class="confirm-label">Task</span><span class="confirm-value" id="c-task">—</span></div>
     <div class="confirm-row"><span class="confirm-label">Worker</span><span class="confirm-value" id="c-worker">—</span></div>
     <div class="confirm-row"><span class="confirm-label">Saved as</span><span class="confirm-value muted" id="c-saved-as">—</span></div>
@@ -181,7 +202,7 @@ textarea:focus{outline:none;border-color:#1a73e8}
 
 <script>
 // === CONFIGURATION — fill in your Apps Script URL ===
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwdT0pR4VnlBqEBhOVCpg5BX8S1IaFiwBv7kzsWWcsZW4tW1eS9dUqmJ-3VUS5G7PXI/exec';
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwNk_h6kYjekbnnQpp4Rxc67UEOxD3N7e0HQQLyBh9YPCs_Fvw0RcO_AS3fQNxqOo33/exec';
 // =====================================================
 
 const ITEMS_TAB   = 'Items';
@@ -189,12 +210,15 @@ const WORKERS_TAB = 'Workers';
 const LOG_TAB     = 'Log';
 const TASKS       = ['Sproits','Apzāģēšana','Aplīmēšana/Montāža','Slīpēšana/Sāni','Izkrāsošana','Labošana','Samērīšana','Pakošana'];
 const SPROITS     = 'Sproits';
+const SAMERISANA  = 'Samērīšana';
+const PO_TAB      = 'PO';
 
 let state = {
   itemNumber:null, itemRowIndex:null, itemData:null, itemModel:null,
-  selectedTask:null, selectedVariant:null, selectedWorker:null, submitTimestamp:null
+  selectedTask:null, selectedVariant:null, selectedWorker:null,
+  selectedPO:null, submitTimestamp:null
 };
-let sheetsData = { items:null, workers:null };
+let sheetsData = { items:null, workers:null, po:null };
 
 function goTo(id){
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
@@ -203,6 +227,7 @@ function goTo(id){
   if(id==='s-search'){
     sheetsData.items=null;
     sheetsData.workers=null;
+    sheetsData.po=null;
   }
 }
 
@@ -217,15 +242,22 @@ function makeEntry(name,ts){
 }
 
 async function fetchSheet(tab){
-  const action = tab === ITEMS_TAB ? 'getItems' : 'getWorkers';
-  const r = await fetch(`${SCRIPT_URL}?action=${action}`);
+  const actionMap={'Items':'getItems','Workers':'getWorkers','PO':'getPO'};
+  const action=actionMap[tab]||'getItems';
+  const r=await fetch(`${SCRIPT_URL}?action=${action}`);
   if(!r.ok) throw new Error(`Could not load ${tab}. Check your Apps Script URL.`);
-  const txt = await r.text();
+  const txt=await r.text();
   let d;
-  try { d = JSON.parse(txt); }
-  catch(e){ throw new Error(`Invalid JSON returned while loading ${tab}: ${txt}`); }
-  if(d.status !== 'ok') throw new Error(d.message || `Error loading ${tab}`);
-  return d.data || [];
+  try{d=JSON.parse(txt);}
+  catch(e){throw new Error(`Invalid JSON returned while loading ${tab}: ${txt}`);}
+  if(d.status!=='ok') throw new Error(d.message||`Error loading ${tab}`);
+  return d.data||[];
+}
+
+async function loadData(){
+  sheetsData.items=await fetchSheet('Items');
+  sheetsData.workers=await fetchSheet('Workers');
+  sheetsData.po=await fetchSheet('PO');
 }
 
 async function postForm(payload){
@@ -261,8 +293,9 @@ async function appendLog(entry){
 }
 
 async function loadData(){
-  sheetsData.items   = await fetchSheet(ITEMS_TAB);
-  sheetsData.workers = await fetchSheet(WORKERS_TAB);
+  sheetsData.items=await fetchSheet('Items');
+  sheetsData.workers=await fetchSheet('Workers');
+  sheetsData.po=await fetchSheet('PO');
 }
 
 async function doSearch(){
@@ -344,10 +377,51 @@ function selectVariant(variant,btn){
 }
 
 function selectTask(task){
-  state.selectedTask=task; state.selectedVariant=null;
+  state.selectedTask=task; state.selectedVariant=null; state.selectedPO=null;
+  if(task===SAMERISANA){
+    startPOSelection();
+    return;
+  }
   document.getElementById('w-task-name').textContent=task;
   document.getElementById('workers-back-btn').onclick=()=>goTo('s-tasks');
   renderWorkers(task); goTo('s-workers');
+}
+
+function startPOSelection(){
+  document.getElementById('po-item-num').textContent=state.itemNumber;
+  const list=document.getElementById('po-list');
+  list.innerHTML='';
+  if(!sheetsData.po||sheetsData.po.length<=1){
+    list.innerHTML=`<p style="color:#888;font-size:14px;text-align:center;padding:2rem">No PO numbers found. Ask your manager to add them.</p>`;
+    goTo('s-po'); return;
+  }
+  const headers=sheetsData.po[0].map(h=>String(h).trim());
+  // PO sheet: PONumber | Ordered_DA30 | Ordered_HA30 | Ordered_DA45 | Ordered_HA45 | Completed_DA30 | Completed_HA30 | Completed_DA45 | Completed_HA45
+  sheetsData.po.slice(1).forEach(row=>{
+    if(!row[0]) return;
+    const poNum=String(row[0]).trim();
+    const btn=document.createElement('button');
+    btn.className='po-btn';
+    // Count total ordered vs completed
+    const ordered=(Number(row[1]||0)+Number(row[2]||0)+Number(row[3]||0)+Number(row[4]||0));
+    const completed=(Number(row[5]||0)+Number(row[6]||0)+Number(row[7]||0)+Number(row[8]||0));
+    btn.innerHTML=`
+      <div>
+        <div class="po-number">${poNum}</div>
+        <div class="po-detail">${completed} / ${ordered} completed</div>
+      </div>
+      <span class="po-count">${poNum}</span>`;
+    btn.onclick=()=>selectPO(poNum);
+    list.appendChild(btn);
+  });
+  goTo('s-po');
+}
+
+function selectPO(poNum){
+  state.selectedPO=poNum;
+  document.getElementById('w-task-name').textContent=`${SAMERISANA} — ${poNum}`;
+  document.getElementById('workers-back-btn').onclick=()=>goTo('s-po');
+  renderWorkers(SAMERISANA); goTo('s-workers');
 }
 
 function renderWorkers(task){
@@ -375,6 +449,9 @@ function selectWorker(id,name){
   const vRow=document.getElementById('c-variant-row');
   if(state.selectedVariant){vRow.style.display='flex';document.getElementById('c-variant').textContent=state.selectedVariant;}
   else vRow.style.display='none';
+  const poRow=document.getElementById('c-po-row');
+  if(state.selectedPO){poRow.style.display='flex';document.getElementById('c-po').textContent=state.selectedPO;}
+  else poRow.style.display='none';
   document.getElementById('c-worker').textContent=`${name} (${id})`;
   document.getElementById('c-saved-as').textContent=`"${entryValue}"`;
   document.getElementById('c-time').textContent=formatTime(now);
@@ -397,11 +474,20 @@ async function doSubmit(){
       const modelCol=headers.indexOf('Model')+1;
       if(modelCol>0) await updateCell(state.itemNumber, headers[modelCol-1], state.selectedVariant);
     }
+    // If Samērīšana — also increment PO completed count
+    if(state.selectedTask===SAMERISANA && state.selectedPO && state.itemModel){
+      await postForm({
+        action:    'incrementPO',
+        poNumber:  state.selectedPO,
+        variant:   state.itemModel
+      });
+    }
     await appendLog({
       timestamp:now.toISOString(),item:state.itemNumber,
       model:state.selectedVariant||state.itemModel,
       task:state.selectedTask,variant:state.selectedVariant||'',
-      workerID:state.selectedWorker.id,workerName:state.selectedWorker.name,comment
+      workerID:state.selectedWorker.id,workerName:state.selectedWorker.name,
+      po:state.selectedPO||'',comment
     });
     state.itemData[state.selectedTask]=entryValue;
     if(state.selectedVariant) state.itemModel=state.selectedVariant;
